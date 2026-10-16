@@ -1,0 +1,13 @@
+
+{
+  "name": "et-org-apostados",
+  "version": "1.0.0",
+  "description": "Bot Discord ET Org Apostados",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3"
+  }
+}
