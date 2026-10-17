@@ -1,46 +1,115 @@
 
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Events
+} = require("discord.js");
 
-const token = process.env.DISCORD_TOKEN;
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-const commands = [
-  new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Verifica se o ET Org Apostados está online')
-].map(command => command.toJSON());
+// Configure os IDs dos administradores no GitHub Secrets.
+// Nunca coloque o token diretamente neste arquivo.
+const ADMINS = (process.env.ADMINS || "")
+  .split(",")
+  .map(id => id.trim())
+  .filter(Boolean);
 
-client.once('ready', async () => {
-  console.log(`👽 ET Org Apostados online: ${client.user.tag}`);
+let servicoAtivo = false;
 
-  try {
-    const rest = new REST({ version: '10' }).setToken(token);
-    await rest.put(
-      Routes.applicationCommands(client.user.id),
-      { body: commands }
-    );
-    console.log('Comando /ping registrado!');
-  } catch (error) {
-    console.error('Erro ao registrar comando:', error);
-  }
+client.once(Events.ClientReady, (bot) => {
+  console.log(`ET Org Apostados conectado como ${bot.user.tag}`);
 });
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand() &&
+      !interaction.isButton()) return;
 
-  if (interaction.commandName === 'ping') {
-    await interaction.reply({
-      content: '👽 ET Org Apostados está online!',
+  if (interaction.isChatInputCommand()) {
+    if (interaction.commandName !== "painel") return;
+
+    if (!ADMINS.includes(interaction.user.id)) {
+      return interaction.reply({
+        content: "⛔ Somente administradores autorizados podem abrir o painel.",
+        ephemeral: true
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x7B2CFF)
+      .setTitle("👽 ET ORG — PAINEL ADM")
+      .setDescription(
+        `**Serviço:** ${servicoAtivo ? "🟢 ATIVO" : "🔴 PAUSADO"}\n\n` +
+        "⚔️ Gerencie o serviço de novas partidas.\n" +
+        "💰 Configure pagamentos em uma próxima etapa.\n" +
+        "🏆 Consulte o ranking quando estiver implementado."
+      )
+      .setFooter({ text: "ET Org Apostados • Administração" });
+
+    const botoes = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("alternar_servico")
+        .setLabel(servicoAtivo ? "Pausar serviço" : "Ativar serviço")
+        .setStyle(servicoAtivo ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId("ver_status")
+        .setLabel("Ver status")
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return interaction.reply({
+      embeds: [embed],
+      components: [botoes],
+      ephemeral: true
+    });
+  }
+
+  if (!ADMINS.includes(interaction.user.id)) {
+    return interaction.reply({
+      content: "⛔ Você não tem autorização para usar este botão.",
+      ephemeral: true
+    });
+  }
+
+  if (interaction.customId === "alternar_servico") {
+    servicoAtivo = !servicoAtivo;
+
+    const embed = new EmbedBuilder()
+      .setColor(servicoAtivo ? 0x22C55E : 0xEF4444)
+      .setTitle("👽 ET ORG — PAINEL ADM")
+      .setDescription(
+        `**Serviço:** ${servicoAtivo ? "🟢 ATIVO" : "🔴 PAUSADO"}`
+      );
+
+    const botoes = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("alternar_servico")
+        .setLabel(servicoAtivo ? "Pausar serviço" : "Ativar serviço")
+        .setStyle(servicoAtivo ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId("ver_status")
+        .setLabel("Ver status")
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return interaction.update({
+      embeds: [embed],
+      components: [botoes]
+    });
+  }
+
+  if (interaction.customId === "ver_status") {
+    return interaction.reply({
+      content: `Status do serviço: ${servicoAtivo ? "🟢 ATIVO" : "🔴 PAUSADO"}`,
       ephemeral: true
     });
   }
 });
 
-if (!token) {
-  console.error('Configure a variável secreta DISCORD_TOKEN.');
-  process.exit(1);
-}
+client.login(process.env.DISCORD_TOKEN);
 
-client.login(token);
